@@ -17,14 +17,14 @@ from python_vehicle_simulator.vehicles import *
 from python_vehicle_simulator.lib import *
 
 # Simulation parameters: 
-sampleTime = 0.02                   # sample time [seconds]
-N = 10000                           # number of samples
+sampleTime = 0.02                   # sample time [seconds] 
+N = 10000                           # number of samples  #it times sample time by N to get the time of the simulation
 
 # 3D plot and animation parameters where browser = {firefox,chrome,safari,etc.}
 numDataPoints = 50                  # number of 3D data points
 FPS = 10                            # frames per second (animated GIF)
 filename = '3D_animation.gif'       # data file for animated GIF
-browser = 'safari'                  # browser for visualization of animated GIF
+browser = 'chrome'                  # browser for visualization of animated GIF
 
 ###############################################################################
 # Vehicle constructors
@@ -56,7 +56,9 @@ match no:   #  The match statement requires Python >= 3.10
     case '6': vehicle = shipClarke83('headingAutopilot',-20.0,70,8,6,0.7,0.5,10.0,1e5)
     case '7': vehicle = supply('DPcontrol',4.0,4.0,100.0,0.5,20.0)
     case '8': vehicle = tanker('headingAutopilot',-20,0.5,150,20,80)
-    case '9': vehicle = remus100('depthHeadingAutopilot',30,50,1525,0.5,170)     
+    case '9': vehicle = remus100('depthHeadingAutopilot',30,50,1525,0.5,170)  
+    case '10': vehicle = drewUV('depthHeadingAutopilot',60,50,1525,0.5,170)  #the control inputs are depth, heading, rpm, then current speed, Current direction degrees
+       
     case _: print('Error: Not a valid simulator option'), sys.exit()
 
 printVehicleinfo(vehicle, sampleTime, N)
