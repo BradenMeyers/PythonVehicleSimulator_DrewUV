@@ -48,8 +48,8 @@ Author:     Thor I. Fossen
 import numpy as np
 import math
 import sys
-from python_vehicle_simulator.lib.control import PIDpolePlacement
-from python_vehicle_simulator.lib.gnc import crossFlowDrag,forceLiftDrag,Hmtrx,m2c,gvect,ssa
+from lib.control import PIDpolePlacement
+from lib.gnc import crossFlowDrag,forceLiftDrag,Hmtrx,m2c,gvect,ssa
 
 # Class Vehicle
 class drewUV:
@@ -107,8 +107,8 @@ class drewUV:
         # Initialize the AUV model 
         self.name = (
             "DrewUV cylinder-shaped AUV (see 'drewUV.py' for more details)")
-        self.L = 1.6                # length (m)
-        self.diam = 0.19            # cylinder diameter (m)
+        self.L = 1.05                # length (m)
+        self.diam = 0.057*2          # cylinder diameter (m)
         
         self.nu = np.array([0, 0, 0, 0, 0, 0], float) # velocity vector
         self.u_actual = np.array([0, 0, 0, 0], float)    # control input vector
@@ -127,7 +127,7 @@ class drewUV:
         self.deltaMax_re = 30 * self.D2R # max right elevator angle (rad)
         self.deltaMax_le = 30 * self.D2R # max left elevator plane angle (rad)
         self.nMax = 1525                # max propeller revolution (rpm)    
-        self.T_delta = 1.0              # rudder/stern plane time constant (s)  #This is think controls how fast you can move the fins. How many seconds to move one radian
+        self.T_delta = 0.09*3             # 0.09 second for 60 degrees acrcoding to amazon rudder/stern plane time constant (s) How many seconds to move one radian
         self.T_n = 1.0                  # propeller time constant (s)           #TODO:look at this? is this how fast they can move  
         
         if r_rpm < 0.0 or r_rpm > self.nMax:
@@ -140,19 +140,19 @@ class drewUV:
         self.S = 0.7 * self.L * self.diam    # S = 70% of rectangle L * diam
         a = self.L/2            #Distance from center to fin             # semi-axes
         b = self.diam/2   #Radius of vehicle  
-        c = b * 1.5           #TODO: Get a more accurate value     
-        self.r_bg = np.array([0, 0, 0.02], float)    # CG w.r.t. to the CO  #TODO: Find offset in meters maybe?
+        c = 1.7/2        #TODO: Know where the center of lift force is     
+        self.r_bg = np.array([0, 0, 0.03], float)    # CG w.r.t. to the CO  #TODO: Find offset in meters maybe?
         self.r_bb = np.array([0, 0, 0], float)       # CB w.r.t. to the CO  #The origin of the vehicle is at the CENTER OF BOYANCY 
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
         # F_drag = 0.5 * rho * Cd * (pi * b^2)   
         # F_drag = 0.5 * rho * CD_0 * S
-        Cd = 0.42                              # from Allen et al. (2000)
+        Cd = 0.42                              # from Allen et al. (2000)  TODO: FIND coefficient of DRAG
         self.CD_0 = Cd * math.pi * b**2 / self.S
         
         #TODO: I think all of these need to be changed
         # Rigid-body mass matrix expressed in CO
-        m = 4/3 * math.pi * self.rho * a * b**2     # mass of spheriod 
+        m = 7.54   #mass on october 31 TODO: Update          #4/3 * math.pi * self.rho * a * b**2     # mass of spheriod 
         Ix = (2/5) * m * b**2                       # moment of inertia
         Iy = (1/5) * m * (a**2 + b**2)
         Iz = Iy
@@ -162,7 +162,7 @@ class drewUV:
 
         # Weight and buoyancy
         self.W = m * g
-        self.B = self.W  #Should I add a little bit to account for the slight offset in boyancy
+        self.B = self.W  #CHEKC: Should I add a little bit to account for the slight offset in boyancy
         
         # Added moment of inertia in roll: A44 = r44 * Ix
         r44 = 0.3      #CHECK: Is this the added momement due to water?       
@@ -185,27 +185,27 @@ class drewUV:
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
 
-        # Natural frequencies in roll and pitch
+        # Natural frequencies in roll and pitch                                  #LOOK INTO THIS! What does this mean?
         self.w_roll = math.sqrt( self.W * ( self.r_bg[2]-self.r_bb[2] ) / 
             self.M[3][3] )
         self.w_pitch = math.sqrt( self.W * ( self.r_bg[2]-self.r_bb[2] ) / 
             self.M[4][4] )
             
         # Tail rudder parameters (single)
-        self.CL_delta_r = 0.5       # rudder lift coefficient
-        self.A_r = 0.10 * 0.05  # rudder area (m2)  #I took out the times 2 because there is only one fin  #COEF
+        self.CL_delta_r = 0.5       # rudder lift coefficient   #CHECK: FIND THESE
+        self.A_r = 0.10 * 0.0469  # rudder area (m2)  #I took out the times 2 because there is only one fin  #COEF
         self.x_r = -a               # rudder x-position (m) How far back it is. 
         self.z_r = -c                #rudder z-position how high up it is 
 
         # Right Elveator paramaters (double)  #TODO: Check Coefficients
         self.CL_delta_re = 0.7       # elevator lift coefficient   
-        self.A_re = 0.10 * 0.05  # elevator area (m2)
+        self.A_re = 0.10 * 0.0469  # elevator area (m2)
         self.x_re = -a               # elevator x-position (m) How far back the fin is
         self.yz_re = c              #How far the fin is from the center in yz plane
 
         # Left Elveator paramaters (double)
         self.CL_delta_le = 0.7       # elevator lift coefficient
-        self.A_le = 0.10 * 0.05  # elevator area (m2)
+        self.A_le = 0.10 * 0.0469  # elevator area (m2)
         self.x_le = -a               # elevator x-position (m) #CHECK THIS: I believe that they only care about how far back on the vehicle
         self.yz_le = -c              #How far the fin is from the center in yz plane
 
@@ -288,7 +288,7 @@ class drewUV:
         
         # Propeller coeffs. KT and KQ are computed as a function of advance no.
         # Ja = Va/(n*D_prop) where Va = (1-w)*U = 0.944 * U; Allen et al. (2000)
-        D_prop = 0.14   # propeller diameter corresponding to 5.5 inches
+        D_prop = 0.076   # Blue roboitcspropeller diameter corresponding to 5.5 inches
         t_prop = 0.1    # thrust deduction number
         n_rps = n / 60  # propeller revolution (rps) 
         Va = 0.944 * U  # advance speed (m/s)
@@ -363,7 +363,7 @@ class drewUV:
         # Horizontal- and vertical-plane relative speed   #What is this relative speed thing
         #Check:
         U_rh = math.sqrt( nu_r[0]**2 + nu_r[1]**2 )
-        U_re = math.sqrt(nu_r[0]**2 + (nu_r[1] * math.sin(math.pi/6))**2 + (nu_r[2] * math.sin(math.pi/3))**2)  #Relative speed in the plane of the elevator fin
+        U_re = math.sqrt(nu_r[0]**2 + (nu_r[1] * math.sin(self.D2R * 30))**2 + (nu_r[2] * math.sin(self.D2R * 60))**2)  #Relative speed in the plane of the elevator fin
         # U_rv = math.sqrt( nu_r[0]**2 + nu_r[2]**2 ) 
 
         #lift forces on the elevator fins on right and left both positve set direction below
@@ -396,7 +396,7 @@ class drewUV:
             (1-t_prop) * X_prop + fx,  #The x forces should be the same. #TODO make the forces half as much because there is only one fin
             fy, 
             Z_re + Z_le,
-            (K_prop / 10) + Mx,   # scaled down by a factor of 10 to match exp. results  #TODO: Find Diameter of the force acting on fin in y-z plane to get roll moment from fin.
+            (K_prop /5) + Mx,   # scaled down by a factor of 10 to match exp. results  #TODO: Find Diameter of the force acting on fin in y-z plane to get roll moment from fin.
             My,     
             Mz     #the x_r is negative because the fin is in the negative x from center. A negative Y force causes postive Z moment!
             ], float)
@@ -438,7 +438,7 @@ class drewUV:
         delta_r =  5 * self.D2R      # rudder angle (rad)
         delta_re = -5 * self.D2R      # right elevator angle (rad)
         delta_le = -5 * self.D2R      # left elevator angle (rad)  #TODO: Need to figure out what this is
-        n = 1525                     # propeller revolution (rpm)
+        n = 1000                    # propeller revolution (rpm)
         
         if t > 100:
             delta_r = 0
@@ -536,9 +536,6 @@ class drewUV:
         # Euler's integration method (k+1)
         self.e_psi_int += sampleTime * ssa( psi - self.psi_d )
         
-        delta_r = 0 * self.D2R
-        delta_re = 5 * self.D2R
-        delta_le = 5 * self.D2R
         
         u_control = np.array([ delta_r, delta_re, delta_le, n], float)
 

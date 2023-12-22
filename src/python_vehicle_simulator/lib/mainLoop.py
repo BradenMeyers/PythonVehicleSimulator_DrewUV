@@ -39,7 +39,7 @@ def printSimInfo():
     print('7 - Offshore supply vessel: controlled by tunnel thrusters and main propellers, L = 76.2 m')
     print('8 - Tanker: rudder-controlled ship model including shallow water effects, L = 304.8 m')
     print('9 - Remus 100: AUV controlled by stern planes, a tail rudder and a propeller, L = 1.6 m')
-    print('10 - DrewUV: AUV controlled by stern planes, a tail rudder, two elevators, and a propeller, L = 1.6 m')
+    print('10 - DrewUV: AUV controlled by stern planes, a tail rudder, two elevators, and a propeller, L = 1.05 m')
     print('---------------------------------------------------------------------------------------')    
     
 ###############################################################################    
