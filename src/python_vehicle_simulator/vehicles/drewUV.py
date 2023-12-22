@@ -48,8 +48,8 @@ Author:     Thor I. Fossen
 import numpy as np
 import math
 import sys
-from lib.control import PIDpolePlacement
-from lib.gnc import crossFlowDrag,forceLiftDrag,Hmtrx,m2c,gvect,ssa
+from python_vehicle_simulator.lib.control import PIDpolePlacement
+from python_vehicle_simulator.lib.gnc import crossFlowDrag,forceLiftDrag,Hmtrx,m2c,gvect,ssa
 
 # Class Vehicle
 class drewUV:
@@ -91,11 +91,13 @@ class drewUV:
                 + str(r_psi) 
                 + " deg"
                 )
+            print("Autopilot Control")
 
         else:
             self.controlDescription = (
                 "Step inputs for elevators, rudder and propeller")
             controlSystem = "stepInput"
+            print("step Input control")
             
         self.ref_z = r_z
         self.ref_psi = r_psi
@@ -141,7 +143,7 @@ class drewUV:
         a = self.L/2            #Distance from center to fin             # semi-axes
         b = self.diam/2   #Radius of vehicle  
         c = 1.7/2        #TODO: Know where the center of lift force is     
-        self.r_bg = np.array([0, 0, 0.03], float)    # CG w.r.t. to the CO  #TODO: Find offset in meters maybe?
+        self.r_bg = np.array([0, 0, 0.005], float)    # CG w.r.t. to the CO  #TODO: Find offset in meters maybe?
         self.r_bb = np.array([0, 0, 0], float)       # CB w.r.t. to the CO  #The origin of the vehicle is at the CENTER OF BOYANCY 
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
@@ -378,16 +380,16 @@ class drewUV:
 
         # Rudder and elevator sway force 
         Y_r = -0.5 * self.rho * U_rh**2 * self.A_r * self.CL_delta_r * delta_r
-        Y_re = -fl_re * math.sin(math.pi/6)
-        Y_le = fl_le * math.sin(math.pi/6)  #Check to make sure the negative one is on the right
+        Y_re = -fl_re * math.sin(30 * self.D2R)
+        Y_le = fl_le * math.sin(30 * self.D2R)  #Check to make sure the negative one is on the right
         fy = Y_r + Y_re + Y_le        
 
         # elevator heave force 
-        Z_re = fl_re * math.sin(math.pi/3)     
-        Z_le = fl_le * math.sin(math.pi/3)
+        Z_re = fl_re * math.sin(60 * self.D2R)     
+        Z_le = fl_le * math.sin(60 * self.D2R)
 
         Mx = (Y_r * self.z_r * -1) + (self.yz_re * fl_re) + (self.yz_le * fl_le)   #CHECK: See which way it spins with the deflection of each fin
-        My = (self.x_re * Z_re) + (self.x_le * Z_le)                            #CHECK: I did this right tilt elevators up and push vehicle forward it should pitch up or positive y moment
+        My = (self.x_re * -Z_re) + (self.x_le * -Z_le)                            #CHECK: I did this right tilt elevators up and push vehicle forward it should pitch up or positive y moment
         Mz =  (self.x_r * Y_r) + (self.x_re * Y_re) + (self.x_le * Y_le)    #the rudder cause biggest yaw moment but rudders can too but they can cancel out
 
         # Generalized force vector  #TODO: Fix the force vector with X_re and Z_re
@@ -437,13 +439,13 @@ class drewUV:
         """
         delta_r =  5 * self.D2R      # rudder angle (rad)
         delta_re = -5 * self.D2R      # right elevator angle (rad)
-        delta_le = -5 * self.D2R      # left elevator angle (rad)  #TODO: Need to figure out what this is
+        delta_le = 5 * self.D2R      # left elevator angle (rad)  #TODO: Need to figure out what this is
         n = 1000                    # propeller revolution (rpm)
         
-        if t > 100:
+        if t > 50:
             delta_r = 0
             
-        if t > 50:
+        if t > 25:
             delta_re = 0     
             delta_le = 0     
 
