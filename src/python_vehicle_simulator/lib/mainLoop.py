@@ -40,6 +40,7 @@ def printSimInfo():
     print('8 - Tanker: rudder-controlled ship model including shallow water effects, L = 304.8 m')
     print('9 - Remus 100: AUV controlled by stern planes, a tail rudder and a propeller, L = 1.6 m')
     print('10 - DrewUV: AUV controlled by stern planes, a tail rudder, two elevators, and a propeller, L = 1.05 m')
+    print('11 - IVER: AUV controlled by two stern rudders, two tail rudders, and a propeller, L = 1.05 m')
     print('---------------------------------------------------------------------------------------')    
     
 ###############################################################################    
@@ -99,4 +100,6 @@ def simulate(N, sampleTime, vehicle):
     # Store simulation time vector
     simTime = np.arange(start=0, stop=t+sampleTime, step=sampleTime)[:, None]
 
+    print(eta, nu)  
+    
     return(simTime,simData)

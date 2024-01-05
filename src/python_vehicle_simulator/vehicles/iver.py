@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-drewUV.py:  
+iver.py:  
 
-   Class for the Remus 100 cylinder-shaped autonomous underwater vehicle (AUV), 
-   which is controlled using a tail rudder, stern planes and a propeller. The 
-   length of the AUV is 1.6 m, the cylinder diameter is 19 cm and the 
-   mass of the vehicle is 31.9 kg. The maximum speed of 2.5 m/s is obtained 
+   Class for the iver torpedo-shaped autonomous underwater vehicle (AUV), 
+   which is controlled using a top and bottom tail rudders, and two stern planes and a propeller. The 
+   length of the AUV is ??, the cylinder diameter is ?? and the 
+   mass of the vehicle is 36 kg??. The maximum speed of 2.5 m/s?? is obtained 
    when the propeller runs at 1525 rpm in zero currents.
        
-  Drew UV()                           
-       Step input, Right and Left Elevators, rudder and propeller revolution     
+   iver()                           
+       Step input, stern plane, rudder and propeller revolution     
    
-    remus100('depthHeadingAutopilot',z_d,psi_d,n_d,V_c,beta_c)
+    iver('depthHeadingAutopilot',z_d,psi_d,n_d,V_c,beta_c)
         z_d:    desired depth (m), positive downwards
         psi_d:  desired yaw angle (deg)
         n_d:    desired propeller revolution (rpm)
@@ -24,15 +24,17 @@ Methods:
     [nu,u_actual] = dynamics(eta,nu,u_actual,u_control,sampleTime ) returns 
         nu[k+1] and u_actual[k+1] using Euler's method. The control input is:
 
-            u_control = [ delta_r   rudder angle (rad)
-                         delta_s    stern plane angle (rad)
+            u_control = [ delta_rt   rudder top angle (rad)
+                         delta_rb   rudder bottom angle (rad)
+                         delta_sr    stern right plane angle (rad)
+                         delta_sl    stern left plane angle (rad)
                          n          propeller revolution (rpm) ]
 
     u = depthHeadingAutopilot(eta,nu,sampleTime) 
         Simultaneously control of depth and heading using two controllers of 
         PID type. Propeller rpm is given as a step command.
        
-    u = stepInput(t) generates tail rudder, elevator fins and RPM step inputs.   
+    u = stepInput(t) generates tail rudder, stern planes and RPM step inputs.   
        
 References: 
     
@@ -52,26 +54,26 @@ from lib.control import PIDpolePlacement
 from lib.gnc import crossFlowDrag,forceLiftDrag,Hmtrx,m2c,gvect,ssa
 
 # Class Vehicle
-class drewUV:
+class iver:
     """
-    remus100()
+    iver()
         Rudder angle, stern plane and propeller revolution step inputs
         
-    remus100('depthHeadingAutopilot',z_d,psi_d,n_d,V_c,beta_c) 
+    iver('depthHeadingAutopilot',z_d,psi_d,n_d,V_c,beta_c) 
         Depth and heading autopilots
         
     Inputs:
         z_d:    desired depth, positive downwards (m)
         psi_d:  desired heading angle (deg)
         n_d:    desired propeller revolution (rpm)
-        V_c:    current speed (m/s)                     Is this like the ocean current speed? I think so. #CHECK
+        V_c:    current speed (m/s)
         beta_c: current direction (deg)
     """
 
     def __init__(
         self,
         controlSystem="stepInput",
-        r_z = 0,  
+        r_z = 0,
         r_psi = 0,
         r_rpm = 0,
         V_current = 0,
@@ -91,13 +93,11 @@ class drewUV:
                 + str(r_psi) 
                 + " deg"
                 )
-            print("Autopilot Control")
 
         else:
             self.controlDescription = (
-                "Step inputs for elevators, rudder and propeller")
+                "Step inputs for left and right stern planes, top and bottom rudder, and propeller")
             controlSystem = "stepInput"
-            print("step Input control")
             
         self.ref_z = r_z
         self.ref_psi = r_psi
@@ -108,17 +108,18 @@ class drewUV:
         
         # Initialize the AUV model 
         self.name = (
-            "DrewUV cylinder-shaped AUV (see 'drewUV.py' for more details)")
-        self.L = 1.05                # length (m)
-        self.diam = 0.057*2          # cylinder diameter (m)
+            "Iver cylinder-shaped AUV (see 'iver.py' for more details)")
+        self.L = 1.6             #COEF   # length (m)
+        self.diam = 0.19         #COEF   # cylinder diameter (m)
         
         self.nu = np.array([0, 0, 0, 0, 0, 0], float) # velocity vector
-        self.u_actual = np.array([0, 0, 0, 0], float)    # control input vector
+        self.u_actual = np.array([0, 0, 0, 0, 0], float)    # control input vector
         
         self.controls = [
-            "Tail rudder (deg)",
-            "Left Elevator (deg)",
-            "Right Elevator (deg)",
+            "Top Tail rudder (deg)",
+            "Bottom Tail rudder (deg)",
+            "Left Stern (deg)",
+            "Right Stern  (deg)",
             "Propeller revolution (rpm)"
             ]
         self.dimU = len(self.controls) 
@@ -126,11 +127,10 @@ class drewUV:
 
         # Actuator dynamics
         self.deltaMax_r = 30 * self.D2R # max rudder angle (rad)
-        self.deltaMax_re = 30 * self.D2R # max right elevator angle (rad)
-        self.deltaMax_le = 30 * self.D2R # max left elevator plane angle (rad)
+        self.deltaMax_s = 30 * self.D2R # max stern plane angle (rad)       #LOOK: do we need seperate for each fin?
         self.nMax = 1525                # max propeller revolution (rpm)    
-        self.T_delta = 0.09*3             # 0.09 second for 60 degrees acrcoding to amazon rudder/stern plane time constant (s) How many seconds to move one radian
-        self.T_n = 1.0                  # propeller time constant (s)           #TODO:look at this? is this how fast they can move  
+        self.T_delta = 1.0              # rudder/stern plane time constant (s)
+        self.T_n = 1.0                  # propeller time constant (s)
         
         if r_rpm < 0.0 or r_rpm > self.nMax:
             sys.exit("The RPM value should be in the interval 0-%s", (self.nMax))
@@ -140,21 +140,20 @@ class drewUV:
         
         # Hydrodynamics (Fossen 2021, Section 8.4.2)    
         self.S = 0.7 * self.L * self.diam    # S = 70% of rectangle L * diam
-        a = self.L/2            #Distance from center to fin             # semi-axes
-        b = self.diam/2   #Radius of vehicle  
-        c = 1.7/2        #TODO: Know where the center of lift force is     
-        self.r_bg = np.array([0, 0, 0.005], float)    # CG w.r.t. to the CO  #TODO: Find offset in meters maybe?
-        self.r_bb = np.array([0, 0, 0], float)       # CB w.r.t. to the CO  #The origin of the vehicle is at the CENTER OF BOYANCY 
+        a = self.L/2                         # semi-axes
+        b = self.diam/2                  
+        self.r_bg = np.array([0, 0, 0.02], float)    #MEASURE       # CG w.r.t. to the CO
+        self.r_bb = np.array([0, 0, 0], float)       # CB w.r.t. to the CO
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
         # F_drag = 0.5 * rho * Cd * (pi * b^2)   
         # F_drag = 0.5 * rho * CD_0 * S
-        Cd = 0.42                              # from Allen et al. (2000)  TODO: FIND coefficient of DRAG
+        Cd = 0.42                              # from Allen et al. (2000)
         self.CD_0 = Cd * math.pi * b**2 / self.S
         
-        #TODO: I think all of these need to be changed
+        #COEF
         # Rigid-body mass matrix expressed in CO
-        m = 7.54   #mass on october 31 TODO: Update          #4/3 * math.pi * self.rho * a * b**2     # mass of spheriod 
+        m = 4/3 * math.pi * self.rho * a * b**2     # mass of spheriod 
         Ix = (2/5) * m * b**2                       # moment of inertia
         Iy = (1/5) * m * (a**2 + b**2)
         Iz = Iy
@@ -164,10 +163,10 @@ class drewUV:
 
         # Weight and buoyancy
         self.W = m * g
-        self.B = self.W  #CHEKC: Should I add a little bit to account for the slight offset in boyancy
+        self.B = self.W
         
         # Added moment of inertia in roll: A44 = r44 * Ix
-        r44 = 0.3      #CHECK: Is this the added momement due to water?       
+        r44 = 0.3           
         MA_44 = r44 * Ix
         
         # Lamb's k-factors
@@ -187,29 +186,22 @@ class drewUV:
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
 
-        # Natural frequencies in roll and pitch                                  #LOOK INTO THIS! What does this mean?
+        # Natural frequencies in roll and pitch
         self.w_roll = math.sqrt( self.W * ( self.r_bg[2]-self.r_bb[2] ) / 
             self.M[3][3] )
         self.w_pitch = math.sqrt( self.W * ( self.r_bg[2]-self.r_bb[2] ) / 
             self.M[4][4] )
             
+        #COEF    
         # Tail rudder parameters (single)
-        self.CL_delta_r = 0.5       # rudder lift coefficient   #CHECK: FIND THESE
-        self.A_r = 0.10 * 0.0469  # rudder area (m2)  #I took out the times 2 because there is only one fin  #COEF
-        self.x_r = -a               # rudder x-position (m) How far back it is. 
-        self.z_r = -c                #rudder z-position how high up it is 
+        self.CL_delta_r = 0.5       # rudder lift coefficient
+        self.A_r = 0.10 * 0.05      # rudder area (m2) #TOOK OUT TIMES 2 to account for one fin
+        self.x_r = -a               # rudder x-position (m)
 
-        # Right Elveator paramaters (double)  #TODO: Check Coefficients
-        self.CL_delta_re = 0.7       # elevator lift coefficient   
-        self.A_re = 0.10 * 0.0469  # elevator area (m2)
-        self.x_re = -a               # elevator x-position (m) How far back the fin is
-        self.yz_re = c              #How far the fin is from the center in yz plane
-
-        # Left Elveator paramaters (double)
-        self.CL_delta_le = 0.7       # elevator lift coefficient
-        self.A_le = 0.10 * 0.0469  # elevator area (m2)
-        self.x_le = -a               # elevator x-position (m) #CHECK THIS: I believe that they only care about how far back on the vehicle
-        self.yz_le = -c              #How far the fin is from the center in yz plane
+        # Stern-plane paramaters (double)
+        self.CL_delta_s = 0.7       # stern-plane lift coefficient
+        self.A_s =  0.10 * 0.05     # stern-plane area (m2)  #TOOK OUT TIMES 2 to account for one fin  
+        self.x_s = -a               # stern-plane z-position (m)
 
         # Low-speed linear damping matrix parameters
         self.T_surge = 20           # time constant in surge (s)
@@ -232,6 +224,7 @@ class drewUV:
         self.e_psi_int = 0     # yaw angle error integral state
         
         
+        
         # Depth autopilot
         self.wn_d_z = 1/20     # desired natural frequency, reference model
         self.Kp_z = 0.1        # heave proportional gain, outer loop
@@ -249,12 +242,10 @@ class drewUV:
         """
         [nu,u_actual] = dynamics(eta,nu,u_actual,u_control,sampleTime) integrates
         the AUV equations of motion using Euler's method.
-
-        nu is the 
         """
 
         # Current velocities
-        u_c = self.V_c * math.cos(self.beta_c - eta[5])  # current surge velocity  using the parameter of direction of current
+        u_c = self.V_c * math.cos(self.beta_c - eta[5])  # current surge velocity
         v_c = self.V_c * math.sin(self.beta_c - eta[5])  # current sway velocity
 
         nu_c = np.array([u_c, v_c, 0, 0, 0, 0], float) # current velocity 
@@ -265,32 +256,37 @@ class drewUV:
         U_r = math.sqrt(nu_r[0]**2 + nu_r[1]**2 + nu_r[2]**2)  # relative speed
 
         # Commands and actual control signals
-        delta_r_c = u_control[0]    # commanded tail rudder (rad)
-        delta_re_c = u_control[1]    # commanded right elevator (rad)
-        delta_le_c = u_control[2]    # commanded left elevator (rad)
-        n_c = u_control[3]          # commanded propeller revolution (rpm)
+        delta_rt_c = u_control[0]    # commanded tail top rudder (rad)
+        delta_rb_c = u_control[1]    # commanded tail bottom rudder (rad)
+        delta_sl_c = u_control[2]    # commanded stern left plane (rad)
+        delta_sr_c = u_control[3]    # commanded stern right  plane (rad)
+        n_c = u_control[4]          # commanded propeller revolution (rpm)
         
-        delta_r = u_actual[0]       # actual tail rudder (rad)
-        delta_re = u_actual[1]       # actual right elevator (rad)
-        delta_le = u_actual[2]       # actual left elevator (rad)
-        n = u_actual[3]             # actual propeller revolution (rpm)
+        delta_rt = u_actual[0]       # actual tail top rudder (rad)
+        delta_rb = u_actual[1]       # actual tail bottom rudder (rad)
+        delta_sl = u_actual[2]       # actual stern left plane (rad)
+        delta_sr = u_actual[3]       # actual stern right plane (rad)
+        n = u_actual[4]             # actual propeller revolution (rpm)
         
         # Amplitude saturation of the control signals
-        if abs(delta_r) >= self.deltaMax_r:
-            delta_r = np.sign(delta_r) * self.deltaMax_r
-            
-        if abs(delta_re) >= self.deltaMax_re:
-            delta_re = np.sign(delta_re) * self.deltaMax_re          
+        if abs(delta_rt) >= self.deltaMax_r:
+            delta_rt = np.sign(delta_rt) * self.deltaMax_r
         
-        if abs(delta_le) >= self.deltaMax_le:
-            delta_le = np.sign(delta_le) * self.deltaMax_le          
+        if abs(delta_rb) >= self.deltaMax_r:
+            delta_rb = np.sign(delta_rb) * self.deltaMax_r
+            
+        if abs(delta_sl) >= self.deltaMax_s:
+            delta_sl = np.sign(delta_sl) * self.deltaMax_s          
+            
+        if abs(delta_sr) >= self.deltaMax_s:
+            delta_sr = np.sign(delta_sr) * self.deltaMax_s          
             
         if abs(n) >= self.nMax:
             n = np.sign(n) * self.nMax       
         
         # Propeller coeffs. KT and KQ are computed as a function of advance no.
         # Ja = Va/(n*D_prop) where Va = (1-w)*U = 0.944 * U; Allen et al. (2000)
-        D_prop = 0.076   # Blue roboitcspropeller diameter corresponding to 5.5 inches
+        D_prop = 0.14   # propeller diameter corresponding to 5.5 inches
         t_prop = 0.1    # thrust deduction number
         n_rps = n / 60  # propeller revolution (rps) 
         Va = 0.944 * U  # advance speed (m/s)
@@ -312,9 +308,6 @@ class drewUV:
         # KT ~= KT_0 + (KT_max-KT_0)/Ja_max * Ja   
         # KQ ~= KQ_0 + (KQ_max-KQ_0)/Ja_max * Ja  
       
-        #X_prop is the thrust
-        #K_prop is the torque of the thruster
-
         if n_rps > 0:   # forward thrust
 
             X_prop = self.rho * pow(D_prop,4) * ( 
@@ -334,7 +327,7 @@ class drewUV:
         CA  = m2c(self.MA, nu_r)
                
         # Nonlinear quadratic velocity terms in pitch and yaw (Munk moments) 
-        # are set to zero since only linear damping is used  
+        # are set to zero since only linear damping is used
         CA[4][0] = 0  
         CA[4][3] = 0
         CA[5][0] = 0
@@ -356,72 +349,62 @@ class drewUV:
         D[1][1] = D[1][1] * math.exp(-3*U_r) # go to zero at higher speeds, i.e.
         D[5][5] = D[5][5] * math.exp(-3*U_r) # drag and lift/drag dominate
 
-        tau_liftdrag = forceLiftDrag(self.diam,self.S,self.CD_0,alpha,U_r)   #calculate lift and drag from cross sectional area, and position and speed
+        tau_liftdrag = forceLiftDrag(self.diam,self.S,self.CD_0,alpha,U_r)
         tau_crossflow = crossFlowDrag(self.L,self.diam,self.diam,nu_r)
 
         # Restoring forces and moments
         g = gvect(self.W,self.B,eta[4],eta[3],self.r_bg,self.r_bb)
         
-        # Horizontal- and vertical-plane relative speed   #What is this relative speed thing
-        #Check:
+        # Horizontal- and vertical-plane relative speed
         U_rh = math.sqrt( nu_r[0]**2 + nu_r[1]**2 )
-        U_re = math.sqrt(nu_r[0]**2 + (nu_r[1] * math.sin(self.D2R * 30))**2 + (nu_r[2] * math.sin(self.D2R * 60))**2)  #Relative speed in the plane of the elevator fin
-        # U_rv = math.sqrt( nu_r[0]**2 + nu_r[2]**2 ) 
+        U_rv = math.sqrt( nu_r[0]**2 + nu_r[2]**2 ) 
 
-        #lift forces on the elevator fins on right and left both positve set direction below
-        fl_re = 0.5 * self.rho * U_re**2 * self.A_r * self.CL_delta_r * delta_re
-        fl_le = 0.5 * self.rho * U_re**2 * self.A_r * self.CL_delta_r * delta_le
+        # Rudder and stern-plane drag
+        X_r = -0.5 * self.rho * U_rh**2 * self.A_r * self.CL_delta_r * delta_rt**2
+        X_r += -0.5 * self.rho * U_rh**2 * self.A_r * self.CL_delta_r * delta_rb**2
+        X_s = -0.5 * self.rho * U_rv**2 * self.A_s * self.CL_delta_s * delta_sl**2
+        X_s += -0.5 * self.rho * U_rv**2 * self.A_s * self.CL_delta_s * delta_sr**2
 
-        # Rudder and elevator drag # These should be the same as 4 fin because it is moving in x direction just need half of this I believe
-        X_r = -0.5 * self.rho * U_rh**2 * self.A_r * self.CL_delta_r * delta_r**2  #Using the relative speed in the horziontal plane 
-        X_re = -0.5 * self.rho * U_re**2 * self.A_re * self.CL_delta_re * delta_re**2    
-        X_le = -0.5 * self.rho * U_re**2 * self.A_le * self.CL_delta_le * delta_le**2  
-        fx = X_r + X_re + X_le
+        # Rudder sway force 
+        Y_r = -0.5 * self.rho * U_rh**2 * self.A_r * self.CL_delta_r * delta_rt
+        Y_r += -0.5 * self.rho * U_rh**2 * self.A_r * self.CL_delta_r * delta_rb
 
-        # Rudder and elevator sway force 
-        Y_r = -0.5 * self.rho * U_rh**2 * self.A_r * self.CL_delta_r * delta_r
-        Y_re = -fl_re * math.sin(30 * self.D2R)
-        Y_le = fl_le * math.sin(30 * self.D2R)  #Check to make sure the negative one is on the right
-        fy = Y_r + Y_re + Y_le        
+        # Stern-plane heave force
+        Z_s = -0.5 * self.rho * U_rv**2 * self.A_s * self.CL_delta_s * delta_sl
+        Z_s += -0.5 * self.rho * U_rv**2 * self.A_s * self.CL_delta_s * delta_sr
 
-        # elevator heave force 
-        Z_re = fl_re * math.sin(60 * self.D2R)     
-        Z_le = fl_le * math.sin(60 * self.D2R)
-
-        Mx = (Y_r * self.z_r * -1) + (self.yz_re * fl_re) + (self.yz_le * fl_le)   #CHECK: See which way it spins with the deflection of each fin
-        My = (self.x_re * -Z_re) + (self.x_le * -Z_le)                            #CHECK: I did this right tilt elevators up and push vehicle forward it should pitch up or positive y moment
-        Mz =  (self.x_r * Y_r) + (self.x_re * Y_re) + (self.x_le * Y_le)    #the rudder cause biggest yaw moment but rudders can too but they can cancel out
-
-        # Generalized force vector  #TODO: Fix the force vector with X_re and Z_re
-        #Looks like the vector is in format [fx, fy, fz, MX, MY, MZ] This is in the body grame
+        # Generalized force vector
         tau = np.array([
-            (1-t_prop) * X_prop + fx,  #The x forces should be the same. #TODO make the forces half as much because there is only one fin
-            fy, 
-            Z_re + Z_le,
-            (K_prop /5) + Mx,   # scaled down by a factor of 10 to match exp. results  #TODO: Find Diameter of the force acting on fin in y-z plane to get roll moment from fin.
-            My,     
-            Mz     #the x_r is negative because the fin is in the negative x from center. A negative Y force causes postive Z moment!
+            (1-t_prop) * X_prop + X_r + X_s, 
+            Y_r, 
+            Z_s,
+            K_prop / 10,   # scaled down by a factor of 10 to match exp. results
+            self.x_s * Z_s,
+            self.x_r * Y_r
             ], float)
     
-        # AUV dynamics 
-        #Tau_sum is the result of all the dynamics of the vehicle 
-        tau_sum = tau + tau_liftdrag + tau_crossflow - np.matmul(C+D,nu_r)  - g
+        # AUV dynamics
+        tau_sum = tau + tau_liftdrag + tau_crossflow - np.matmul(C+D,nu_r)  - g   #TODO: Understand how these lines work
         nu_dot = Dnu_c + np.matmul(self.Minv, tau_sum)
+
+        #WE COULD EXPORT HERE THE nu_dot which is the accelartion of the vehicle.
             
         # Actuator dynamics
-        delta_r_dot = (delta_r_c - delta_r) / self.T_delta
-        delta_re_dot = (delta_re_c - delta_re) / self.T_delta
-        delta_le_dot = (delta_le_c - delta_le) / self.T_delta      #This sets the fin angle as it aproaches the commanded angle. A larger time constant will make it move slower
+        delta_rt_dot = (delta_rt_c - delta_rt) / self.T_delta
+        delta_rb_dot = (delta_rb_c - delta_rb) / self.T_delta
+        delta_sl_dot = (delta_sl_c - delta_sl) / self.T_delta
+        delta_sr_dot = (delta_sr_c - delta_sr) / self.T_delta
         n_dot = (n_c - n) / self.T_n
 
         # Forward Euler integration [k+1]
         nu += sampleTime * nu_dot
-        delta_r += sampleTime * delta_r_dot
-        delta_re += sampleTime * delta_re_dot
-        delta_le += sampleTime * delta_le_dot
+        delta_rt += sampleTime * delta_rt_dot
+        delta_rb += sampleTime * delta_rb_dot
+        delta_sl += sampleTime * delta_sl_dot
+        delta_sr += sampleTime * delta_sr_dot
         n += sampleTime * n_dot
         
-        u_actual = np.array([ delta_r, delta_re, delta_le, n ], float)
+        u_actual = np.array([delta_rt, delta_rb, delta_sl, delta_sr, n], float)
 
         return nu, u_actual
 
@@ -432,39 +415,43 @@ class drewUV:
                      
         Returns:
             
-            u_control = [ delta_r   rudder angle (rad)
-                         delta_re    right elevator angle (rad)
-                         delta_le    left elevator angle (rad)
+            u_control = [ delta_r   rudder top angle (rad)
+                         delta_rb   rudder bottom angle (rad)
+                         delta_sl    stern left angle (rad)
+                         delta_sr    stern right angle (rad)
                          n          propeller revolution (rpm) ]
         """
-        delta_r =  5 * self.D2R      # rudder angle (rad)
-        delta_re = -5 * self.D2R      # right elevator angle (rad)
-        delta_le = 5 * self.D2R      # left elevator angle (rad)  #TODO: Need to figure out what this is
-        n = 1000                    # propeller revolution (rpm)
+        delta_rt =  5 * self.D2R      # rudder angle (rad)
+        delta_rb =  5 * self.D2R      # rudder angle (rad)
+        delta_sl = -5 * self.D2R      # stern angle (rad)
+        delta_sr = -5 * self.D2R      # stern angle (rad)
+        n = 1525                     # propeller revolution (rpm)
         
-        if t > 50:
-            delta_r = 0
+        if t > 100:
+            delta_rt = 0
+            delta_rb = 0
             
-        if t > 25:
-            delta_re = 0     
-            delta_le = 0     
+        if t > 50:
+            delta_sl = 0     
+            delta_sr = 0     
 
-        u_control = np.array([ delta_r, delta_re, delta_le, n], float)
+        u_control = np.array([delta_rt, delta_rb, delta_sl, delta_sr, n], float)
 
         return u_control
     
     
     def depthHeadingAutopilot(self, eta, nu, sampleTime):
         """
-        [delta_r, delta_s, n] = depthHeadingAutopilot(eta,nu,sampleTime) 
+        [delta_rt, delta_rb, delta_sl, delta_sr, n] = depthHeadingAutopilot(eta,nu,sampleTime) 
         simultaneously control the heading and depth of the AUV using control
         laws of PID type. Propeller rpm is given as a step command.
         
         Returns:
             
-            u_control = [ delta_r   rudder angle (rad)
-                         delta_re    right elevator angle (rad)
-                         delta_le    left elevator angle (rad)
+            u_control = [ delta_rt   rudder top angle (rad)
+                         delta_rb   rudder bottom angle (rad)
+                         delta_sl   stern left angle (rad)
+                         delta_sr    stern right angle (rad)
                          n          propeller revolution (rpm) ]
             
         """
@@ -492,11 +479,9 @@ class drewUV:
             
         # PI controller    
         theta_d = self.Kp_z * ( (z - self.z_d) + (1/self.T_z) * self.z_int )
-        # delta_s = -self.Kp_theta * ssa( theta - theta_d ) - self.Kd_theta * q \
-        #     - self.Ki_theta * self.theta_int
-        delta_re = 0  #TODO: this is the hard part
-        delta_le = 0  #TODO: this is the hard part
-
+        delta_sl = -self.Kp_theta * ssa( theta - theta_d ) - self.Kd_theta * q \
+            - self.Ki_theta * self.theta_int
+        delta_sr = delta_sl
 
         # Euler's integration method (k+1)
         self.z_int     += sampleTime * ( z - self.z_d )
@@ -538,8 +523,10 @@ class drewUV:
         # Euler's integration method (k+1)
         self.e_psi_int += sampleTime * ssa( psi - self.psi_d )
         
+        delta_rt = delta_r
+        delta_rb = delta_r
         
-        u_control = np.array([ delta_r, delta_re, delta_le, n], float)
+        u_control = np.array([delta_rt, delta_rb, delta_sl, delta_sr, n], float)
 
         return u_control
 

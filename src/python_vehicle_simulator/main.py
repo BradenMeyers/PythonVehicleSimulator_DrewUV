@@ -13,8 +13,8 @@ Author:     Thor I. Fossen
 import os
 import webbrowser
 import matplotlib.pyplot as plt
-from python_vehicle_simulator.vehicles import *
-from python_vehicle_simulator.lib import *
+from vehicles import *
+from lib import *
 
 # Simulation parameters: 
 sampleTime = 0.02                   # sample time [seconds] 
@@ -58,6 +58,7 @@ match no:   #  The match statement requires Python >= 3.10
     case '8': vehicle = tanker('headingAutopilot',-20,0.5,150,20,80)
     case '9': vehicle = remus100('depthHeadingAutopilot',30,50,1525,0.5,170)  
     case '10': vehicle = drewUV('stepInput',60,50,1525,0.5,170)  #the control inputs are depth, heading, rpm, then current speed, Current direction degrees
+    case '11': vehicle = iver('depthHeadingAutopilot',30,50,1525,0.5,170)  
        
     case _: print('Error: Not a valid simulator option'), sys.exit()
 
