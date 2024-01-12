@@ -65,7 +65,7 @@ def simulate(N, sampleTime, vehicle):
     t = 0                       # initial simulation time
 
     # Initial state vectors
-    eta = np.array([0, 0, 0, 0, 0, 0], float)    # position/attitude, user editable
+    eta = np.array([0, 0, 10, 0, 0, 0], float)    # position/attitude, user editable
     nu = vehicle.nu                              # velocity, defined by vehicle class
     u_actual = vehicle.u_actual                  # actual inputs, defined by vehicle class
     
@@ -100,6 +100,22 @@ def simulate(N, sampleTime, vehicle):
     # Store simulation time vector
     simTime = np.arange(start=0, stop=t+sampleTime, step=sampleTime)[:, None]
 
-    print(eta, nu)  
+    # print("position_fsim", eta)
+    # print("velocity_fsim", nu)  
+    import csv
+    csv_file_path = 'simulation_data_Fossen.csv'
+
+    # Write the combined signals to the CSV file
+    with open(csv_file_path, 'w', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        
+        # Write header if needed
+        # csv_writer.writerow(['Signal1_FOS', 'Signal2_FOS', ..., 'SignalN_FOS', 'Signal1_HOLO', 'Signal2_HOLO', ..., 'SignalN_HOLO'])
+        
+        # Write the data rows
+        csv_writer.writerows(simData)
+
+    print(f"Data exported to {csv_file_path}")
     
+
     return(simTime,simData)

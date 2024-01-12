@@ -112,13 +112,13 @@ class drewUV:
         self.L = 1.05                # length (m)
         self.diam = 0.057*2          # cylinder diameter (m)
         
-        self.nu = np.array([0, 0, 0, 0, 0, 0], float) # velocity vector
-        self.u_actual = np.array([0, 0, 0, 0], float)    # control input vector
+        self.nu = np.array([0, 0, 0, 0, 0, 0], float) # inital velocity vector
+        self.u_actual = np.array([0, 0, 0, 0], float)    # initial control surfaces vector
         
         self.controls = [
-            "Tail rudder (deg)",
-            "Left Elevator (deg)",
-            "Right Elevator (deg)",
+            "Tail rudder (rad)",
+            "Left Elevator (rad)",
+            "Right Elevator (rad)",
             "Propeller revolution (rpm)"
             ]
         self.dimU = len(self.controls) 
@@ -437,10 +437,10 @@ class drewUV:
                          delta_le    left elevator angle (rad)
                          n          propeller revolution (rpm) ]
         """
-        delta_r =  5 * self.D2R      # rudder angle (rad)
+        delta_r =  0 * self.D2R      # rudder angle (rad)
         delta_re = -5 * self.D2R      # right elevator angle (rad)
-        delta_le = 5 * self.D2R      # left elevator angle (rad)  #TODO: Need to figure out what this is
-        n = 1000                    # propeller revolution (rpm)
+        delta_le = -5 * self.D2R      # left elevator angle (rad)  #TODO: Need to figure out what this is
+        n = 3000                    # propeller revolution (rpm)
         
         if t > 50:
             delta_r = 0

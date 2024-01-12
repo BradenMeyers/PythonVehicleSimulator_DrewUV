@@ -18,7 +18,7 @@ from lib import *
 
 # Simulation parameters: 
 sampleTime = 0.02                   # sample time [seconds] 
-N = 3000                           # number of samples  #it times sample time by N to get the time of the simulation
+N = 500                           # number of samples  #it times sample time by N to get the time of the simulation
 
 # 3D plot and animation parameters where browser = {firefox,chrome,safari,etc.}
 numDataPoints = 50                  # number of 3D data points
