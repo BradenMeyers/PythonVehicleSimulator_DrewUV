@@ -67,10 +67,11 @@ def simulate(N, sampleTime, vehicle):
     # Initial state vectors
     eta = np.array([0, 0, 10, 0, 0, 0], float)    # position/attitude, user editable
     nu = vehicle.nu                              # velocity, defined by vehicle class
+    nu_dot = [0,0,0,0,0,0]
     u_actual = vehicle.u_actual                  # actual inputs, defined by vehicle class
     
     # Initialization of table used to store the simulation data
-    simData = np.empty( [0, 2*DOF + 2 * vehicle.dimU], float)
+    simData = np.empty( [0, 3*DOF + 2 * vehicle.dimU], float)
 
     # Simulator for-loop
     for i in range(0,N+1):
@@ -90,11 +91,11 @@ def simulate(N, sampleTime, vehicle):
             u_control = vehicle.stepInput(t)          
         
         # Store simulation data in simData
-        signals = np.append( np.append( np.append(eta,nu),u_control), u_actual )
+        signals = np.append(np.append( np.append( np.append(eta,nu),u_control), u_actual ), nu_dot)
         simData = np.vstack( [simData, signals] ) 
 
         # Propagate vehicle and attitude dynamics
-        [nu, u_actual]  = vehicle.dynamics(eta,nu,u_actual,u_control,sampleTime)
+        [nu, u_actual, nu_dot]  = vehicle.dynamics(eta,nu,u_actual,u_control,sampleTime)
         eta = attitudeEuler(eta,nu,sampleTime)
 
     # Store simulation time vector

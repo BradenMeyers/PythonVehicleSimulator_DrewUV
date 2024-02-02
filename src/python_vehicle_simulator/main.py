@@ -75,7 +75,7 @@ def main():
     plotControls(simTime, simData, vehicle, 2)
     plot3D(simData, numDataPoints, FPS, filename, 3)   
     
-    """ Ucomment the line below for 3D animation in the web browswer. 
+    """ Ucomment the lin10e below for 3D animation in the web browswer. 
     Alternatively, open the animated GIF file manually in your preferred browser. """
     # webbrowser.get(browser).open_new_tab('file://' + os.path.abspath(filename))
     

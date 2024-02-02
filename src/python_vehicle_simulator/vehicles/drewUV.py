@@ -143,8 +143,8 @@ class drewUV:
         a = self.L/2            #Distance from center to fin             # semi-axes
         b = self.diam/2   #Radius of vehicle  
         c = 1.7/2        #TODO: Know where the center of lift force is     
-        self.r_bg = np.array([0, 0, 0.005], float)    # CG w.r.t. to the CO  #TODO: Find offset in meters maybe?
-        self.r_bb = np.array([0, 0, 0], float)       # CB w.r.t. to the CO  #The origin of the vehicle is at the CENTER OF BOYANCY 
+        self.r_bg = np.array([0, 0, 0], float)    # CG w.r.t. to the CO  #TODO: Find offset in meters maybe?
+        self.r_bb = np.array([0, 0, -0.005], float)       # CB w.r.t. to the CO  #The origin of the vehicle is at the CENTER OF BOYANCY 
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
         # F_drag = 0.5 * rho * Cd * (pi * b^2)   
@@ -423,7 +423,7 @@ class drewUV:
         
         u_actual = np.array([ delta_r, delta_re, delta_le, n ], float)
 
-        return nu, u_actual
+        return nu, u_actual, nu_dot
 
 
     def stepInput(self, t):
@@ -437,10 +437,10 @@ class drewUV:
                          delta_le    left elevator angle (rad)
                          n          propeller revolution (rpm) ]
         """
-        delta_r =  0 * self.D2R      # rudder angle (rad)
+        delta_r =  5 * self.D2R      # rudder angle (rad)
         delta_re = -5 * self.D2R      # right elevator angle (rad)
         delta_le = -5 * self.D2R      # left elevator angle (rad)  #TODO: Need to figure out what this is
-        n = 3000                    # propeller revolution (rpm)
+        n = 1525        #Max 1525            # propeller revolution (rpm)
         
         if t > 50:
             delta_r = 0
