@@ -101,7 +101,48 @@ class fin:
             self.u_actual_fin = np.sign(self.u_actual_fin) * self.deltaMax
 
         return self.u_actual_fin
+    
+    def calculate_deflection(self, desired_torque, nu_r):
+        """
+        Calculate the fin deflection needed to apply a specific torque on the vehicle.
 
+        Parameters:
+            desired_torque (float): Desired torque vector [Tx, Ty, Tz] (N*m) in body-fixed frame
+            nu_r (numpy array): Relative velocity [vx, vy, vz, p, q, r] 
+                                (m/s for linear, rad/s for angular)
+
+        Returns:
+            float: Required fin deflection (radians)
+        """
+        
+        ur = self.velocity_in_rotated_plane(nu_r[:3])  # Calculate relative velocity in plane of the fin
+        
+        if desired_torque[1] != 0 and desired_torque[2] == 0:
+            # Torque about y-axis - desired force in z
+            torque = desired_torque[1]
+            force = -torque / (self.R[0] * -np.cos(self.angle_rad))   # Negated Because it is RxF not R*F
+        elif desired_torque[2] != 0 and desired_torque[1] == 0:
+            # Torque about z-axis - desired force in y
+            torque = desired_torque[2]
+            force = torque / (self.R[0] * np.sin(self.angle_rad))
+        elif desired_torque[1] == 0 and desired_torque[2] == 0:
+            force = 0
+        else:
+            raise ValueError("Only one of Ty or Tz should be non-zero")
+        
+        # Calculate the required deflection
+        den = (0.5 * self.rho * self.area * self.CL * ur**2)
+        if den > 0:
+            required_deflection = force / den
+        else:
+            required_deflection = 0
+        
+        # Ensure the deflection is within reasonable limits 
+        required_deflection = np.clip(required_deflection, -self.deltaMax, self.deltaMax)
+        
+        return required_deflection
+
+#TODO: CHECK THIS FUNCTION ON THE FINS!!!        
 
 
 
@@ -115,7 +156,7 @@ class thruster:
     
     Coordinate system: Right-handed, x-forward, y-starboard, z-down
     '''
-    def __init__(self, rho):
+    def __init__(self, rho=1026):
         # Actuator dynamics
         self.nMax = 1525                # max propeller revolution (rpm)    
         self.T_n = 0.1                  # propeller time constant (s)

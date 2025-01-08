@@ -189,6 +189,7 @@ class torpedo:
         CL_delta_r = 0.5            # rudder lift coefficient
         CL_delta_s = 0.7            # stern-plane lift coefficient
 
+        #TODO: have a place were control subsystems and percentage of responsibility
         portSternFin = fin(S_fin, CL_delta_s, -a, c=0.1,angle=0, rho=self.rho)       
         bottomRudderFin = fin(S_fin, CL_delta_r, -a, c=0.1, angle=90, rho=self.rho)  
         starSternFin = fin(S_fin, CL_delta_s, -a, c=0.1, angle=180, rho=self.rho)      
@@ -232,11 +233,33 @@ class torpedo:
         self.T_z = 100.0       # heave integral gain, outer loop
         self.Kp_theta = 5.0    # pitch PID controller     
         self.Kd_theta = 2.0  
-        self.Ki_theta = 0.3
+        self.Ki_theta = 0.5
         self.K_w = 5.0         # optional heave velocity feedback gain
         
+        Fe = 20   #equilibrium force of thruster calculated at 1000 rpm 
+        tr_z = 7
+        wn_z = 2.2/tr_z
+        zeta = 0.707
+        self.kp_z = m * (wn_z**2) / Fe
+        # self.kd_z = (2 * wn_z * zeta * m + bz) / Fe
+
+        tr_theta = tr_z/10
+        wn_th = 2.2/tr_theta
+        self.kp_theta = Iy * wn_th**2
+        self.kd_theta = 2 * zeta * wn_th * Iy - self.zeta_pitch
+        # self.T_z = 7       # heave integral gain, outer loop
+        self.wn_d_z = 0.05
+        self.theta_max = 15 * self.D2R
+
+        print("Kp Z:", self.kp_z)
+        print("Kp Theta:", self.kp_theta)
+        print("Kd Theta:", self.kd_theta)
+
+        self.torque_s = 0.0
+
         self.z_int = 0         # heave position integral state
-        self.z_d = 0           # desired position, LP filter initial state
+        self.z_d = 0           # desired position, LP filter initial state  (TODO set as starting value)
+        self.theta_d = 0          # desired theta, LP filter initial state (TODO set as starting value)
         self.theta_int = 0     # pitch angle integral state
         
 
@@ -351,6 +374,7 @@ class torpedo:
         z = eta[2]                  # heave position (depth)
         theta = eta[4]              # pitch angle
         psi = eta[5]                # yaw angle
+        surge = nu[0]               # surge velocity
         w = nu[2]                   # heave velocity
         q = nu[4]                   # pitch rate
         r = nu[5]                   # yaw rate
@@ -367,18 +391,62 @@ class torpedo:
         #######################################################################            
         # Depth autopilot (succesive loop closure)
         #######################################################################
-        # LP filtered desired depth command
-        self.z_d  = math.exp( -sampleTime * self.wn_d_z ) * self.z_d \
-            + ( 1 - math.exp( -sampleTime * self.wn_d_z) ) * z_ref  
+        if surge > 0.6:
+            # LP filtered desired depth command
+            self.z_d  = math.exp( -sampleTime * self.wn_d_z ) * self.z_d \
+                + ( 1 - math.exp( -sampleTime * self.wn_d_z) ) * z_ref  
             
-        # PI controller    
-        theta_d = self.Kp_z * ( (z - self.z_d) + (1/self.T_z) * self.z_int )
-        delta_s = -self.Kp_theta * ssa( theta - theta_d ) - self.Kd_theta * q \
-            - self.Ki_theta * self.theta_int - self.K_w * w
+            #STEP:
+            # self.z_d = z_ref
 
-        # Euler's integration method (k+1)
-        self.z_int     += sampleTime * ( z - self.z_d )
-        self.theta_int += sampleTime * ssa( theta - theta_d )
+            #TODO: What would whappen if instead of low pass, I just did a incremental step towards goal
+            #or just dont run outer loop until within 10 meters of the ref.        
+            threshold = 4
+
+            #WHAT THRESHOLD WOULD MAKE theta_d saturate
+            if abs(z_ref - z) > threshold:
+                # saturate theta_d
+                theta_d = self.theta_max * np.sign(z - z_ref)
+                wn_d_theta = 0.25
+                self.theta_d  = math.exp( -sampleTime * wn_d_theta ) * self.theta_d \
+                + ( 1 - math.exp( -sampleTime * wn_d_theta) ) * theta_d 
+
+                saturated = (self.theta_max/-self.kp_z) * np.sign(z - z_ref)
+                self.z_d = z + saturated # Override low pass filter input
+            else:
+                # PI controller    
+                theta_d = -self.kp_z * ((self.z_d - z) + (1/self.T_z) * self.z_int) 
+                self.z_int     += sampleTime * ( self.z_d - z )
+            
+                #Shouldnt need the max out  on theta if we have this
+                # if abs(theta_d) > self.theta_max:
+                #     theta_d = np.sign(theta_d) * self.theta_max
+                self.theta_d = theta_d
+
+            self.torque_s = self.kp_theta * ssa(self.theta_d - theta ) - self.kd_theta * q  \
+                + self.Ki_theta * self.theta_int #- self.K_w * w 
+            #TODO: research w and kw,   der #- self.kd_theta * q  \
+            
+            #QUESTION: Can you put a LP filter on the output?
+            
+            zg = self.r_bg[2] - self.r_bb[2]
+            torque_eq = zg * self.W * np.sin(theta)
+            # print(torque_eq, torque_s)
+
+            #IS THIS THE RIGHT SIGN?
+            self.torque_s += torque_eq
+            # print(torque_s)
+
+            # Euler's integration method (k+1)
+            
+            self.theta_int += sampleTime * ssa( self.theta_d - theta )
+
+        else:
+            # Wait til speed is high enough to start depth controller 
+
+            #LP filter starting point update 
+            self.theta_d = theta
+        
 
         #######################################################################
         # Heading autopilot (SMC controller)
@@ -408,8 +476,11 @@ class torpedo:
                 self.r_max, 
                 sampleTime 
                 )
+        
+        delta_s2 = self.actuators[2].calculate_deflection([0.0, self.torque_s/2.0, 0.0], nu)
+        delta_s3 = self.actuators[3].calculate_deflection([0, self.torque_s/2.0, 0], nu)
             
-        u_control = np.array([delta_r, -delta_r, delta_s, -delta_s, n], float)
+        u_control = np.array([delta_r, -delta_r, delta_s2, delta_s3, n], float)
 
         return u_control
 
