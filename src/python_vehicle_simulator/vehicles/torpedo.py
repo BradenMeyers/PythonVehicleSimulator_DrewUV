@@ -195,6 +195,8 @@ class torpedo:
         starSternFin = fin(S_fin, CL_delta_s, -a, c=0.1, angle=180, rho=self.rho)      
         topRudderFin = fin(S_fin, CL_delta_r, -a, c=0.1, angle=270, rho=self.rho)  
         self.actuators = [topRudderFin, bottomRudderFin , starSternFin, portSternFin, prop]
+        self.depth_subsystem = [starSternFin, portSternFin]
+        self.heading_subsystem = [topRudderFin, bottomRudderFin]
 
         # Low-speed linear damping matrix parameters
         self.T_surge = 20           # time constant in surge (s)
@@ -435,7 +437,6 @@ class torpedo:
 
             #IS THIS THE RIGHT SIGN?
             self.torque_s += torque_eq
-            # print(torque_s)
 
             # Euler's integration method (k+1)
             
@@ -477,10 +478,18 @@ class torpedo:
                 sampleTime 
                 )
         
-        delta_s2 = self.actuators[2].calculate_deflection([0.0, self.torque_s/2.0, 0.0], nu)
-        delta_s3 = self.actuators[3].calculate_deflection([0, self.torque_s/2.0, 0], nu)
-            
-        u_control = np.array([delta_r, -delta_r, delta_s2, delta_s3, n], float)
+        u_control = []
+        u_control.append(delta_r)
+        u_control.append(-delta_r)
+        # for fin in self.heading_subsystem:
+        #     torque = self.torque_r/len(self.heading_subsystem)
+        #     u_control.append(fin.calculate_deflection([0.0, 0.0, torque]))
+        
+        for fin in self.depth_subsystem:
+            torque = self.torque_s/len(self.depth_subsystem)
+            u_control.append(fin.calculate_deflection([0.0, torque, 0.0], nu))
+        
+        u_control.append(n)
 
         return u_control
 
