@@ -253,9 +253,12 @@ class torpedo:
         self.wn_d_z = 0.05
         self.theta_max = 15 * self.D2R
 
+        self.outer_loop_threshold = self.theta_max/self.kp_z
+
         print("Kp Z:", self.kp_z)
         print("Kp Theta:", self.kp_theta)
         print("Kd Theta:", self.kd_theta)
+        print("OuterLoop Threshold", self.outer_loop_threshold)
 
         self.torque_s = 0.0
 
@@ -403,10 +406,10 @@ class torpedo:
 
             #TODO: What would whappen if instead of low pass, I just did a incremental step towards goal
             #or just dont run outer loop until within 10 meters of the ref.        
-            threshold = 4
+            
 
             #WHAT THRESHOLD WOULD MAKE theta_d saturate
-            if abs(z_ref - z) > threshold:
+            if abs(z_ref - z) > self.outer_loop_threshold:
                 # saturate theta_d
                 theta_d = self.theta_max * np.sign(z - z_ref)
                 wn_d_theta = 0.25
