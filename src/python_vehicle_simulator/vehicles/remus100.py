@@ -380,7 +380,10 @@ class remus100:
             ], float)
     
         # AUV dynamics
-        tau_sum = tau + tau_liftdrag + tau_crossflow - np.matmul(C+D,nu_r)  - g
+        disapative = np.matmul(C+D,nu_r)
+        if disapative[4] > 0.3366:
+            print(disapative)
+        tau_sum = tau + tau_liftdrag + tau_crossflow - disapative  - g
         nu_dot = Dnu_c + np.matmul(self.Minv, tau_sum)
             
         # Actuator dynamics
@@ -409,15 +412,16 @@ class remus100:
                          delta_s    stern plane angle (rad)
                          n          propeller revolution (rpm) ]
         """
-        delta_r =  5 * self.D2R      # rudder angle (rad)
-        delta_s = -5 * self.D2R      # stern angle (rad)
-        n = 1525                     # propeller revolution (rpm)
+        delta_r =  0 * self.D2R      # rudder angle (rad)
+        delta_s = -0 * self.D2R      # stern angle (rad)
+        n = 0                     # propeller revolution (rpm)
         
         if t > 100:
             delta_r = 0
             
         if t > 50:
-            delta_s = 0     
+            delta_s = 0  
+            n = 1525   
 
         u_control = np.array([ delta_r, delta_s, n], float)
 
