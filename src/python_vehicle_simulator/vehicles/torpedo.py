@@ -365,6 +365,7 @@ class torpedo:
         e_r   = r - self.r_d        # yaw rate tracking error
         z_ref = self.ref_z          # heave position (depth) setpoint
         psi_ref = self.ref_psi * self.D2R   # yaw angle setpoint
+        psi_ref = psi + ssa(psi_ref - psi)
         
         #######################################################################
         # Propeller command
