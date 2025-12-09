@@ -158,10 +158,10 @@ class frigate:
         delta_c = stepInput(t) generates stern plane step inputs.
         """    
         delta_c = 20 * (math.pi/180)    
-        if t > 30:
-            delta_c = 10 * (math.pi/180) 
-        if t > 50:
-            delta_c = 0
+        # if t > 30:
+        #     delta_c = 10 * (math.pi/180) 
+        # if t > 50:
+        #     delta_c = 0
             
         u_control = np.array([delta_c],float)   
          

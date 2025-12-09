@@ -57,8 +57,8 @@ def main():
     no = input("Please enter a vehicle no.: ")   
 
     vehicleOptions = {
-        '1': lambda: DSRV('depthAutopilot', 60.0),
-        '2': lambda: frigate('headingAutopilot', 10.0, 100.0),
+        '1': lambda: DSRV('stepInput', 60.0),
+        '2': lambda: frigate('stepInput', 10.0, 100.0),
         '3': lambda: otter('headingAutopilot', 100.0, 0.3, -30.0, 200.0),
         '4': lambda: ROVzefakkel('headingAutopilot', 3.0, 100.0),
         '5': lambda: semisub('DPcontrol', 10.0, 10.0, 40.0, 0.5, 190.0),
