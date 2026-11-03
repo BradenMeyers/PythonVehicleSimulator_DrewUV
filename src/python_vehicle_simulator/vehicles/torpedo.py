@@ -303,7 +303,7 @@ class torpedo:
         # General force vector
         tau = np.zeros(6,float)
         for i in range(self.dimU):
-            tau += self.actuators[i].tau(nu_r, nu)
+            tau += self.actuators[i].tau(nu_r)
             u_actual[i] = self.actuators[i].actuate(sampleTime, u_control[i]) # Actuator Dynamics
 
         # AUV dynamics
